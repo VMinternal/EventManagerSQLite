@@ -1,158 +1,56 @@
 package com.vuongquangminh.eventmanagersqlite;
 
-import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.os.Bundle;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.android.material.textfield.TextInputLayout;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.util.Calendar;
-import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private TextInputEditText etEventName, etLocation, etDate, etReporter, etDescription;
-    private TextInputLayout tilDate;
-    private RadioGroup rgRiskAssessment;
-    private RadioButton rbRiskYes;
-    private MaterialButton btnSaveEvent;
+    private RecyclerView recyclerViewEvents;
+    private FloatingActionButton fabAddEvent;
+    private EventAdapter eventAdapter;
+    private DatabaseHelper databaseHelper;
+    private List<Event> eventList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        initViews();
+        databaseHelper = new DatabaseHelper(this);
 
-        // Open DatePickerDialog when clicking the date field
-        etDate.setOnClickListener(v -> showDatePicker());
+        recyclerViewEvents = findViewById(R.id.recycler_view_events);
+        fabAddEvent = findViewById(R.id.fab_add_event);
 
-        // Handle create event button click
-        btnSaveEvent.setOnClickListener(v -> processFormSubmission());
+        recyclerViewEvents.setLayoutManager(new LinearLayoutManager(this));
+        eventAdapter = new EventAdapter(eventList, event -> {
+            Toast.makeText(MainActivity.this, "Clicked: " + event.getName(), Toast.LENGTH_SHORT).show();
+        });
+        recyclerViewEvents.setAdapter(eventAdapter);
+
+        fabAddEvent.setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, AddEventActivity.class);
+            startActivity(intent);
+        });
     }
 
-    private void initViews() {
-        etEventName = findViewById(R.id.etEventName);
-        etLocation = findViewById(R.id.etLocation);
-        etDate = findViewById(R.id.etDate);
-        tilDate = findViewById(R.id.tilDate);
-        etReporter = findViewById(R.id.etReporter);
-        etDescription = findViewById(R.id.etDescription);
-        rgRiskAssessment = findViewById(R.id.rgRiskAssessment);
-        rbRiskYes = findViewById(R.id.rbRiskYes);
-        btnSaveEvent = findViewById(R.id.btnSaveEvent);
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadEvents();
     }
 
-    private void showDatePicker() {
-        Calendar calendar = Calendar.getInstance();
-        int year = calendar.get(Calendar.YEAR);
-        int month = calendar.get(Calendar.MONTH);
-        int day = calendar.get(Calendar.DAY_OF_MONTH);
-
-        DatePickerDialog datePickerDialog = new DatePickerDialog(this,
-                (view, selectedYear, selectedMonth, selectedDay) -> {
-                    String formattedDate = String.format(Locale.getDefault(), "%02d/%02d/%d", selectedDay, selectedMonth + 1, selectedYear);
-                    etDate.setText(formattedDate);
-                    tilDate.setError(null); // Clear error when date is selected
-                }, year, month, day);
-
-        datePickerDialog.show();
-    }
-
-    private void processFormSubmission() {
-        String name = etEventName.getText().toString().trim();
-        String location = etLocation.getText().toString().trim();
-        String date = etDate.getText().toString().trim();
-        String reporter = etReporter.getText().toString().trim();
-        String description = etDescription.getText().toString().trim();
-        boolean requiresRisk = rbRiskYes.isChecked();
-
-        // Validation: Check mandatory fields
-        if (name.isEmpty()) {
-            etEventName.setError("The event name cannot be left blank!");
-            etEventName.requestFocus();
-            return;
-        } else {
-            etEventName.setError(null);
-        }
-
-        if (location.isEmpty()) {
-            etLocation.setError("The location field cannot be left blank!");
-            etLocation.requestFocus();
-            return;
-        } else {
-            etLocation.setError(null);
-        }
-
-        if (date.isEmpty()) {
-            tilDate.setError("Please select the date of the event!");
-            etDate.requestFocus();
-            return;
-        } else {
-            tilDate.setError(null);
-        }
-
-        if (reporter.isEmpty()) {
-            etReporter.setError("The reporter's name cannot be left blank!");
-            etReporter.requestFocus();
-            return;
-        } else {
-            etReporter.setError(null);
-        }
-
-        // Initialize Event object
-        Event event = new Event(name, location, date, "", requiresRisk, reporter, description);
-
-        // Display confirmation dialog
-        showConfirmationDialog(event);
-    }
-
-    private void showConfirmationDialog(Event event) {
-        String message = "Please confirm the event details:\n\n" +
-                "• Event name: " + event.getName() + "\n" +
-                "• Location: " + event.getLocation() + "\n" +
-                "• Date of the event: " + event.getDate() + "\n" +
-                "• Reporter: " + event.getReporter() + "\n" +
-                "• Risk assessment required: " + (event.isRequiresRiskAssessment() ? "Yes" : "No") + "\n" +
-                "• Description: " + (event.getDescription().isEmpty() ? "(None)" : event.getDescription());
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Event Confirmation")
-                .setMessage(message)
-                .setPositiveButton("Confirm", (dialog, which) -> showSuccessDialog())
-                .setNegativeButton("Edit", (dialog, which) -> dialog.dismiss())
-                .show();
-    }
-
-    private void showSuccessDialog() {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Success")
-                .setMessage("Event saved successfully!")
-                .setPositiveButton("OK", (dialog, which) -> {
-                    dialog.dismiss();
-                    clearForm();
-                })
-                .setCancelable(false)
-                .show();
-    }
-
-    private void clearForm() {
-        etEventName.setText("");
-        etLocation.setText("");
-        etDate.setText("");
-        tilDate.setError(null);
-        etEventName.setError(null);
-        etLocation.setError(null);
-        etReporter.setError(null);
-        etReporter.setText("");
-        etDescription.setText("");
-        rgRiskAssessment.check(R.id.rbRiskNo);
-        etEventName.requestFocus();
+    private void loadEvents() {
+        eventList = databaseHelper.getAllEvents();
+        eventAdapter.updateData(eventList);
     }
 }
